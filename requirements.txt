@@ -1,0 +1,10 @@
+python-dotenv
+selenium
+beautifulsoup4
+pyotp
+requests
+PyMuPDF
+google-generativeai
+openai
+flask
+markdown

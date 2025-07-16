@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Result</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Automation Result</h1>
+
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Result</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if error %}
+                            <div class="alert alert-danger">{{ error }}</div>
+                        {% else %}
+                            {% if action_type == 'summary' %}
+                                <h6>Summary</h6>
+                                <div class="alert alert-info">
+                                    {{ result|safe }}
+                                </div>
+                            {% elif action_type == 'flashcards' %}
+                                <h6>Flashcards</h6>
+                                <div class="list-group mb-3">
+                                    {% if result.flashcards %}
+                                        {% for card in result.flashcards %}
+                                            <div class="list-group-item">
+                                                <h6>Question {{ loop.index }}</h6>
+                                                <p>{{ card.question }}</p>
+                                                <button class="btn btn-sm btn-outline-primary show-answer" data-index="{{ loop.index0 }}">Show Answer</button>
+                                                <div class="answer mt-2" id="answer-{{ loop.index0 }}" style="display: none;">
+                                                    <strong>Answer:</strong> {{ card.answer }}
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="alert alert-warning">No flashcards were generated.</div>
+                                    {% endif %}
+                                </div>
+                            {% elif action_type == 'quiz' %}
+                                <h6>Quiz</h6>
+                                {% if result and result.quiz %}
+                                    <form id="quiz-form">
+                                        <div class="list-group mb-3">
+                                            {% for question in result.quiz %}
+                                                {% set question_index = loop.index0 %}
+                                                <div class="list-group-item">
+                                                    <h6>Question {{ loop.index }}</h6>
+                                                    <p>{{ question.question }}</p>
+                                                    <div class="options">
+                                                        {% for key, option in question.options.items() %}
+                                                            <div class="form-check">
+                                                                <input class="form-check-input" type="radio"
+                                                                       name="q{{ question_index }}"
+                                                                       id="q{{ question_index }}-{{ key }}"
+                                                                       value="{{ key }}">
+                                                                <label class="form-check-label" for="q{{ question_index }}-{{ key }}">
+                                                                    {{ key }}. {{ option }}
+                                                                </label>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    <div class="correct-answer mt-2" id="correct-answer-{{ question_index }}" style="display: none;">
+                                                        <strong>Correct Answer:</strong> {{ question.answer }}. {{ question.options[question.answer] }}
+                                                    </div>
+                                                </div>
+                                            {% endfor %}
+
+                                        </div>
+                                        <button type="button" class="btn btn-primary" id="check-answers">Check Answers</button>
+                                    </form>
+                                {% else %}
+                                    <div class="alert alert-warning">No quiz questions were generated.</div>
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary mt-3">Start New Automation</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.querySelectorAll('.show-answer').forEach(button => {
+            button.addEventListener('click', function() {
+                const index = this.getAttribute('data-index');
+                const answerDiv = document.getElementById(`answer-${index}`);
+                if (answerDiv.style.display === 'none') {
+                    answerDiv.style.display = 'block';
+                    this.textContent = 'Hide Answer';
+                } else {
+                    answerDiv.style.display = 'none';
+                    this.textContent = 'Show Answer';
+                }
+            });
+        });
+
+        if (document.getElementById('check-answers')) {
+            document.getElementById('check-answers').addEventListener('click', function() {
+                document.querySelectorAll('.correct-answer').forEach(el => {
+                    el.style.display = 'block';
+                });
+            });
+        }
+    </script>
+</body>
+</html>

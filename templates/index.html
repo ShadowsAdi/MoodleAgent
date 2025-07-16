@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moodle Agent</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .progress {
+            height: 25px;
+        }
+        #status-container {
+            display: none;
+        }
+        #result-container {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Moodle Task Agent</h1>
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Parameters</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="automation-form">
+                            <div class="mb-3">
+                                <label for="course_name" class="form-label">Course Name</label>
+                                <input type="text" class="form-control" id="course_name" name="course_name" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="subject_name" class="form-label">Subject/Document Name</label>
+                                <input type="text" class="form-control" id="subject_name" name="subject_name" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="action_type" class="form-label">Action Type</label>
+                                <select class="form-select" id="action_type" name="action_type">
+                                    <option value="summary">Summary</option>
+                                    <option value="flashcards">Flashcards</option>
+                                    <option value="quiz">Quiz</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="ai_provider" class="form-label">AI Provider</label>
+                                <select class="form-select" id="ai_provider" name="ai_provider">
+                                    <option value="openai">OpenAI/OpenRouter</option>
+                                    <option value="google">Google AI Studio</option>
+                                    <option value="ollama">Ollama</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary" id="start-btn">Start Automation</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card mt-4" id="status-container">
+                    <div class="card-header">
+                        <h5 class="card-title">Automation Progress</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress mb-3">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                 role="progressbar" id="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <p id="status-message">Initializing...</p>
+                    </div>
+                </div>
+
+                <div class="card mt-4" id="result-container">
+                    <div class="card-header">
+                        <h5 class="card-title">Result</h5>
+                    </div>
+                    <div class="card-body" id="result-content"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('automation-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const startBtn = document.getElementById('start-btn');
+            startBtn.disabled = true;
+            startBtn.textContent = 'Starting...';
+
+            const formData = new FormData(this);
+
+            fetch('/start_automation', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Start Automation';
+                    return;
+                }
+
+                document.getElementById('status-container').style.display = 'block';
+
+                pollStatus();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start Task';
+            });
+        });
+
+        function pollStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    const progressBar = document.getElementById('progress-bar');
+                    progressBar.style.width = data.progress + '%';
+                    progressBar.textContent = data.progress + '%';
+
+                    document.getElementById('status-message').textContent = data.message;
+
+                    if (data.running) {
+                        setTimeout(pollStatus, 1000);
+                    } else {
+                        document.getElementById('start-btn').disabled = false;
+                        document.getElementById('start-btn').textContent = 'Start Automation';
+
+                        if (data.error) {
+                            document.getElementById('result-content').innerHTML = `
+                                <div class="alert alert-danger">${data.error}</div>
+                            `;
+                        } else {
+                            displayResult(data.result);
+                        }
+
+                        document.getElementById('result-container').style.display = 'block';
+                    }
+                });
+        }
+
+        function escapeHTML(str) {
+            return (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function displayResult(result) {
+            const actionType = document.getElementById('action_type').value;
+            const resultContent = document.getElementById('result-content');
+
+            if (actionType === 'summary') {
+                const summaryContent = result || "No summary";
+                resultContent.innerHTML = `
+                    <h6>Summary</h6>
+                    <div class="alert alert-info">${summaryContent}</div>
+                    <button class="btn btn-secondary" onclick="window.location.reload()">Start New Automation</button>
+                `;
+            } else if (actionType === 'flashcards') {
+                console.log('data:', result.flashcards);
+                let flashcardsHTML = '<h6>Flashcards</h6>';
+
+                if (result.flashcards && result.flashcards.length > 0) {
+                    flashcardsHTML += `<p>Showing ${result.flashcards.length} cards:</p>`;
+                    flashcardsHTML += '<div class="list-group mb-3">';
+
+                    result.flashcards.forEach((card, index) => {
+                        if (!card.question) {
+                            console.warn(`Missing question in card ${index}`, card);
+                        }
+                        if (!card.answer) {
+                            console.warn(`Missing answer in card ${index}`, card);
+                        }
+
+                        flashcardsHTML += `
+                            <div class="list-group-item">
+                                <h6>Question ${index + 1}</h6>
+                                <p>${escapeHTML(card.question) || 'No question provided'}</p>
+                                <button class="btn btn-sm btn-outline-primary show-answer" data-index="${index}">
+                                    Show Answer
+                                </button>
+                                <div class="answer mt-2" id="answer-${index}" style="display: none;">
+                                    <strong>Answer:</strong> ${escapeHTML(card.answer) || 'No answer provided'}
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    flashcardsHTML += '</div>';
+                    flashcardsHTML += `<button class="btn btn-primary" onclick="window.open('/result', '_blank')">Go to flashcards</button>`
+                } else {
+                    flashcardsHTML += '<div class="alert alert-warning">No flashcards were generated.</div>';
+                }
+
+                flashcardsHTML += '<button class="btn btn-secondary" onclick="window.location.reload()">Start New Automation</button>';
+                resultContent.innerHTML = flashcardsHTML;
+
+                document.querySelectorAll('.show-answer').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const index = this.getAttribute('data-index');
+                        const answerDiv = document.getElementById(`answer-${index}`);
+                        if (answerDiv.style.display === 'none') {
+                            answerDiv.style.display = 'block';
+                            this.textContent = 'Hide Answer';
+                        } else {
+                            answerDiv.style.display = 'none';
+                            this.textContent = 'Show Answer';
+                        }
+                    });
+                });
+            } else if (actionType === 'quiz') {
+                const newWindow = window.open('/result', '_blank');
+                if (!newWindow) {
+                    resultContent.innerHTML = `
+                        <div class="alert alert-warning">Popup was blocked. Allow popups for this site and try again or press the button below.</div>
+                        <button class="btn btn-primary" onclick="window.open('/result', '_blank')">Go to quiz</button>
+                        <button class="btn btn-secondary" onclick="window.location.reload()">Start New task</button>
+                    `;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
